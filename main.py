@@ -12,15 +12,14 @@ FRAME_WIDTH = 750
 CALIBRATION_TIME = 30
 BG_WEIGHT = 0.5
 OBJ_THRESHOLD = 18
+region_top    = 0
+region_bottom = int(2 * FRAME_HEIGHT / 3)
+region_left   = int(FRAME_WIDTH / 2)
+region_right  = FRAME_WIDTH
 
 # Here we take the current frame, the number of frames elapsed, and how many fingers we've detected
 # so we can print on the screen which gesture is happening (or if the camera is calibrating).
 def write_on_image(frame, hand, frames_elapsed):
-    region_top    = 0
-    region_bottom = int(2 * FRAME_HEIGHT / 3)
-    region_left   = int(FRAME_WIDTH / 2)
-    region_right  = FRAME_WIDTH
-
     hand.update(region_top, region_bottom, region_left, region_right)
     if frames_elapsed < CALIBRATION_TIME:
         text = "Calibrating..."
@@ -42,9 +41,58 @@ def write_on_image(frame, hand, frames_elapsed):
     # Highlight the region of interest using a drawn rectangle.
     cv2.rectangle(frame, (region_left, region_top), (region_right, region_bottom), (255,255,255), 2)
 
+def get_region(frame):
+    # Separate the region of interest from the rest of the frame.
+    region = frame[region_top:region_bottom, region_left:region_right]
+    # Make it grayscale so we can detect the edges more easily.
+    region = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+    # Use a Gaussian blur to prevent frame noise from being labeled as an edge.
+    region = cv2.GaussianBlur(region, (5,5), 0)
+
+    return region
+
+def get_average(region):
+    # We have to use the global keyword because we want to edit the global variable.
+    global background
+    # If we haven't captured the background yet, make the current region the background.
+    if background is None:
+        background = region.copy().astype("float")
+        return
+    # Otherwise, add this captured frame to the average of the backgrounds.
+    cv2.accumulateWeighted(region, background, BG_WEIGHT)
+
+
+def segment(region):
+    global hand
+    # Find the absolute difference between the background and the current frame.
+    diff = cv2.absdiff(background.astype(np.uint8), region)
+
+    # Threshold that region with a strict 0 or 1 ruling so only the foreground remains.
+    thresholded_region = cv2.threshold(diff, OBJ_THRESHOLD, 255, cv2.THRESH_BINARY)[1]
+
+    # Get the contours of the region, which will return an outline of the hand.
+    contours, _ = cv2.findContours(
+        thresholded_region.copy(),
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE
+        )
+
+    # If we didn't get anything, there's no hand.
+    if len(contours) == 0:
+        if hand is not None:
+            hand.isInFrame = False
+        return
+    # Otherwise return a tuple of the filled hand (thresholded_region), along with the outline (segmented_region).
+    else:
+        if hand is not None:
+            hand.isInFrame = True
+        segmented_region = max(contours, key = cv2.contourArea)
+        return (thresholded_region, segmented_region)
+
+
 def main():
     frames_elapsed = 0
-    capture = cv2.VideoCapture(0)
+    capture = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
     while (True):
         # Store the frame from the video capture and resize it to the desired window size.
@@ -52,7 +100,19 @@ def main():
         frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
         # Flip the frame over the vertical axis so that it works like a mirror, which is more intuitive to the user.
         frame = cv2.flip(frame, 1)
+
+        # Separate the region of interest and prep it for edge detection.
+        region = get_region(frame)
         
+        if frames_elapsed < CALIBRATION_TIME:
+            get_average(region)
+        else:
+            region_pair = segment(region)
+            if region_pair is not None:
+                # If we have the regions segmented successfully, show them in another window for the user.
+                (thresholded_region, segmented_region) = region_pair
+                cv2.drawContours(region, [segmented_region], -1, (255, 255, 255))
+                cv2.imshow("Segmented Image", region)
         # Write the action the hand is doing on the screen, and draw the region of interest.
         write_on_image(frame, hand, frames_elapsed)
         cv2.imshow("Camera Input", frame)
