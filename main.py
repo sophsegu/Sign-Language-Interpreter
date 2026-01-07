@@ -21,6 +21,7 @@ region_right  = FRAME_WIDTH
 # so we can print on the screen which gesture is happening (or if the camera is calibrating).
 def write_on_image(frame, hand, frames_elapsed):
     hand.update(region_top, region_bottom, region_left, region_right)
+    text = ""
     if frames_elapsed < CALIBRATION_TIME:
         text = "Calibrating..."
     elif hand == None or not hand.isInFrame:
@@ -28,12 +29,6 @@ def write_on_image(frame, hand, frames_elapsed):
     else:
         if hand.isWaving:
             text = "Waving"
-        elif hand.fingers == 0:
-            text = "Rock"
-        elif hand.fingers == 1:
-            text = "Pointing"
-        elif hand.fingers == 2:
-            text = "Scissors"
     
     cv2.putText(frame, text, (10,20), cv2.FONT_HERSHEY_COMPLEX, 0.4,( 0 , 0 , 0 ),2,cv2.LINE_AA)
     cv2.putText(frame, text, (10,20), cv2.FONT_HERSHEY_COMPLEX, 0.4,(255,255,255),1,cv2.LINE_AA)
@@ -89,6 +84,27 @@ def segment(region):
         segmented_region = max(contours, key = cv2.contourArea)
         return (thresholded_region, segmented_region)
 
+def get_hand_data(thresholded_image, segmented_image):
+    # Enclose the area around the extremities in a convex hull to connect all outcroppings.
+    convexHull = cv2.convexHull(segmented_image)
+    
+    # Find the extremities for the convex hull and store them as points.
+    top    = tuple(convexHull[convexHull[:, :, 1].argmin()][0])
+    bottom = tuple(convexHull[convexHull[:, :, 1].argmax()][0])
+    left   = tuple(convexHull[convexHull[:, :, 0].argmin()][0])
+    right  = tuple(convexHull[convexHull[:, :, 0].argmax()][0])
+    
+    # Get the center of the palm, so we can check for waving and find the fingers.
+    centerX = int((left[0] + right[0]) / 2)
+
+    if hand == None:
+        hand = HandData(top, bottom, left, right, centerX)
+    else:
+        hand.update(top, bottom, left, right)
+    
+    # Only check for waving every 6 frames.
+    if frames_elapsed % 6 == 0:
+        hand.check_for_waving(centerX)
 
 def main():
     frames_elapsed = 0
@@ -97,6 +113,10 @@ def main():
     while (True):
         # Store the frame from the video capture and resize it to the desired window size.
         ret, frame = capture.read()
+        if not ret or frame is None:
+            print("Frame not captured")
+            continue
+
         frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
         # Flip the frame over the vertical axis so that it works like a mirror, which is more intuitive to the user.
         frame = cv2.flip(frame, 1)
@@ -120,6 +140,9 @@ def main():
         # Check if user wants to exit.
         if (cv2.waitKey(1) & 0xFF == ord('x')):
             break
+
+        if (cv2.waitKey(1) & 0xFF == ord('r')):
+            frames_elapsed = 0
 
     # When we exit the loop, we have to stop the capture too.
     capture.release()
