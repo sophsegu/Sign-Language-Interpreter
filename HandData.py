@@ -7,7 +7,8 @@ class HandData:
     prevCenterX = 0
     isInFrame = False
     isWaving = False
-    fingers = 0
+    fingers = None
+    gestureList = []
     
     def __init__(self, top, bottom, left, right, centerX):
         self.top = top

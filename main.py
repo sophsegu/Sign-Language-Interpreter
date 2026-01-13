@@ -30,6 +30,12 @@ def write_on_image(frame, hand, frames_elapsed):
     else:
         if hand.isWaving:
             text = "Waving"
+        elif hand.fingers == 0:
+            text = "Rock"
+        elif hand.fingers == 1:
+            text = "Pointing"
+        elif hand.fingers == 2:
+            text = "Scissors"
     
     cv2.putText(frame, text, (10,20), cv2.FONT_HERSHEY_COMPLEX, 0.4,( 0 , 0 , 0 ),2,cv2.LINE_AA)
     cv2.putText(frame, text, (10,20), cv2.FONT_HERSHEY_COMPLEX, 0.4,(255,255,255),1,cv2.LINE_AA)
@@ -56,6 +62,49 @@ def get_average(region):
         return
     # Otherwise, add this captured frame to the average of the backgrounds.
     cv2.accumulateWeighted(region, background, BG_WEIGHT)
+
+
+def count_fingers(thresholded_image):
+    height, width = thresholded_image.shape
+
+    # Create an empty mask
+    line_mask = np.zeros_like(thresholded_image)
+
+    # Line at 70% of hand height
+    line_height = int(height * 0.7)
+
+    # Draw the line ON THE MASK
+    cv2.line(
+        line_mask,
+        (0, line_height),
+        (width, line_height),
+        255,
+        1
+    )
+
+    # AND mask with hand
+    line_intersection = cv2.bitwise_and(
+        thresholded_image,
+        thresholded_image,
+        mask=line_mask
+    )
+
+    # Find contours on the line
+    contours, _ = cv2.findContours(
+        line_intersection,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_NONE
+    )
+
+    fingers = 0
+    palm_width = abs(hand.right[0] - hand.left[0])
+
+    for cnt in contours:
+        if 5 < len(cnt) < palm_width * 0.75:
+            fingers += 1
+
+    return fingers
+
 
 
 def segment(region):
@@ -108,6 +157,24 @@ def get_hand_data(thresholded_image, segmented_image):
     # Only check for waving every 6 frames.
     if frames_elapsed % 6 == 0:
         hand.check_for_waving(centerX)
+
+    hand.gestureList.append(count_fingers(thresholded_image.copy()))
+    if frames_elapsed % 12 == 0:
+        hand.fingers = most_frequent(hand.gestureList)
+        hand.gestureList.clear()
+    
+
+def most_frequent(input_list):
+    dict = {}
+    count = 0
+    most_freq = 0
+    
+    for item in reversed(input_list):
+        dict[item] = dict.get(item, 0) + 1
+        if dict[item] >= count :
+            count, most_freq = dict[item], item
+    
+    return most_freq
 
 def main():
     frames_elapsed = 0
