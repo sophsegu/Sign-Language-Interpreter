@@ -24,3 +24,12 @@ class HandData:
         self.bottom = bottom
         self.left = left
         self.right = right
+
+    def check_for_waving(self, centerX):
+        self.prevCenterX = self.centerX
+        self.centerX = centerX
+        
+        if abs(self.centerX - self.prevCenterX > 3):
+            self.isWaving = True
+        else:
+            self.isWaving = False
