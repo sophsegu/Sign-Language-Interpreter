@@ -26,7 +26,7 @@ Planned:
 ## Core Technologies
 
 * **Python 3.13**
-* **MediaPipe Tasks API** (NOT `mp.solutions`)
+* **MediaPipe Tasks API**
 * **OpenCV** (camera + visualization)
 * **TensorFlow Lite** (used internally by MediaPipe)
 
