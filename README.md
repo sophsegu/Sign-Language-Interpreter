@@ -126,5 +126,3 @@ cv2.VideoCapture(1)
 
 ---
 
-
-If you are reading this and can interpret landmark data — you are officially doing computer vision 🚀
