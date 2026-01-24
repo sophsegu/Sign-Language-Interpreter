@@ -3,10 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
-from sklearn.decomposition import PCA
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.neighbors import KNeighborsClassifier
 
 x = []
 y = []
@@ -23,3 +20,7 @@ for item in dir_list:
 # Checked if index size matches the label size. (Also previoussly checked that landmarks are of correct size)
 #if len(x) == len(y):
     #print("Data loaded successfully.")
+
+knn = KNeighborsClassifier(n_neighbors=5)
+
+knn.fit(x, y)
