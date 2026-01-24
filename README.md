@@ -126,3 +126,9 @@ cv2.VideoCapture(1)
 
 ---
 
+Using ASL Videos from Kaggle
+
+For this project, I used the WLASL dataset from Kaggle.
+I processed the videos into hand landmarks using MediaPipe. Each frame becomes a small .npy file with the hand’s x, y, z coordinates for each of the 21 landmarks.
+Here is the link to the original dataset: https://www.kaggle.com/datasets/risangbaskoro/wlasl-processed
+
