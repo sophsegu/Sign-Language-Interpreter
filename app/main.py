@@ -18,7 +18,7 @@ def normalize_landmarks(hand):
 
 # Load model
 base_options = python.BaseOptions(
-    model_asset_path="hand_landmarker.task"
+    model_asset_path="models/hand_landmarker.task"
 )
 
 options = vision.HandLandmarkerOptions(
