@@ -3,6 +3,10 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
+import os
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "hand_landmarker.task")
 
 def normalize_landmarks(hand):
     points = np.array([[lm.x, lm.y, lm.z] for lm in hand])
@@ -18,7 +22,7 @@ def normalize_landmarks(hand):
 
 # Load model
 base_options = python.BaseOptions(
-    model_asset_path="models/hand_landmarker.task"
+    model_asset_path=MODEL_PATH
 )
 
 options = vision.HandLandmarkerOptions(

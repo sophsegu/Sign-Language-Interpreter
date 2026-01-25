@@ -1,23 +1,37 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+from sklearn.neighbors import KNeighborsClassifier
 import cv2
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-import numpy as np
-import os
 
-# ----------------------------
-# CONFIGURATION
-# ----------------------------
-DATA_DIR = "asl_data"         # folder to save samples
-LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"  # letters you want to record
-SAMPLES_PER_LETTER = 200      # target number of samples per letter
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "hand_landmarker.task")
-os.makedirs(DATA_DIR, exist_ok=True)
 
-# ----------------------------
-# HELPER FUNCTION
-# ----------------------------
+x = []
+y = []
+
+path = r"C:\Users\sophs\OneDrive\Desktop\Sign-Language-Interpreter\asl_data"
+dir_list = os.listdir(path)
+
+for item in dir_list:
+    second_path = os.path.join(path, item)
+    for file in os.listdir(second_path):
+        y.append(item)
+        x.append(np.load(os.path.join(second_path, file)))
+
+# Checked if index size matches the label size. (Also previoussly checked that landmarks are of correct size)
+#if len(x) == len(y):
+    #print("Data loaded successfully.")
+
+knn = KNeighborsClassifier(n_neighbors=15)
+
+knn.fit(x, y)
+
 def normalize_landmarks(hand):
     points = np.array([[lm.x, lm.y, lm.z] for lm in hand])
     origin = points[0]  # wrist
@@ -27,30 +41,13 @@ def normalize_landmarks(hand):
         points /= scale
     return points.flatten()  # 63-d vector
 
-def save_sample(letter, features):
-    # Create letter folder if it doesn't exist
-    letter_dir = os.path.join(DATA_DIR, letter)
-    os.makedirs(letter_dir, exist_ok=True)
-    # Save with a unique filename
-    count = len(os.listdir(letter_dir))
-    filename = os.path.join(letter_dir, f"{count}.npy")
-    np.save(filename, features)
 
-# ----------------------------
-# INITIALIZE MEDIAPIPE
-# ----------------------------
 base_options = python.BaseOptions(model_asset_path=MODEL_PATH)
 options = vision.HandLandmarkerOptions(base_options=base_options, num_hands=1)
 detector = vision.HandLandmarker.create_from_options(options)
 
 cap = cv2.VideoCapture(0)
 
-print("Press a letter key (A-Z) to record that sign.")
-print("Press ESC to exit.")
-
-# ----------------------------
-# MAIN LOOP
-# ----------------------------
 while True:
     success, frame = cap.read()
     if not success:
@@ -69,18 +66,17 @@ while True:
             cx, cy = int(lm.x * w), int(lm.y * h)
             cv2.circle(frame, (cx, cy), 5, (0, 255, 0), -1)
 
+        features = normalize_landmarks(hand)
+        prediction = knn.predict([features])
+        cv2.putText(frame, f"Prediction: {prediction[0]}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+
+    # Show the frame **after all drawing**
     cv2.imshow("Hand Tracking - Data Collection", frame)
 
+    # Break on ESC key
     key = cv2.waitKey(1) & 0xFF
-    if key == 27:  # ESC
+    if key == 27:
         break
 
-    # Check if key corresponds to a letter
-    if chr(key).upper() in LETTERS:
-        if result.hand_landmarks:
-            features = normalize_landmarks(result.hand_landmarks[0])
-            save_sample(chr(key).upper(), features)
-            print(f"Saved sample for letter {chr(key).upper()}")
-            
 cap.release()
 cv2.destroyAllWindows()
