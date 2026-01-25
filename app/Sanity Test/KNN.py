@@ -28,7 +28,7 @@ for item in dir_list:
 #if len(x) == len(y):
     #print("Data loaded successfully.")
 
-knn = KNeighborsClassifier(n_neighbors=5)
+knn = KNeighborsClassifier(n_neighbors=15)
 
 knn.fit(x, y)
 
@@ -48,9 +48,6 @@ detector = vision.HandLandmarker.create_from_options(options)
 
 cap = cv2.VideoCapture(0)
 
-# ----------------------------
-# MAIN LOOP
-# ----------------------------
 while True:
     success, frame = cap.read()
     if not success:
@@ -69,11 +66,17 @@ while True:
             cx, cy = int(lm.x * w), int(lm.y * h)
             cv2.circle(frame, (cx, cy), 5, (0, 255, 0), -1)
 
-    
-
         features = normalize_landmarks(hand)
         prediction = knn.predict([features])
         cv2.putText(frame, f"Prediction: {prediction[0]}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-            
+
+    # Show the frame **after all drawing**
+    cv2.imshow("Hand Tracking - Data Collection", frame)
+
+    # Break on ESC key
+    key = cv2.waitKey(1) & 0xFF
+    if key == 27:
+        break
+
 cap.release()
 cv2.destroyAllWindows()
