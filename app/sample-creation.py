@@ -11,7 +11,8 @@ import os
 DATA_DIR = "asl_data"         # folder to save samples
 LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"  # letters you want to record
 SAMPLES_PER_LETTER = 200      # target number of samples per letter
-
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "hand_landmarker.task")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # ----------------------------
@@ -38,7 +39,7 @@ def save_sample(letter, features):
 # ----------------------------
 # INITIALIZE MEDIAPIPE
 # ----------------------------
-base_options = python.BaseOptions(model_asset_path="hand_landmarker.task")
+base_options = python.BaseOptions(model_asset_path=MODEL_PATH)
 options = vision.HandLandmarkerOptions(base_options=base_options, num_hands=1)
 detector = vision.HandLandmarker.create_from_options(options)
 
