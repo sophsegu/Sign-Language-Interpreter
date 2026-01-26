@@ -6,3 +6,5 @@ requests
 html5lib
 seaborn
 scikit-learn
+tensorflow
+keras
