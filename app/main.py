@@ -1,59 +1,71 @@
 import cv2
-import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
 import numpy as np
+import collections
+import tensorflow as tf
 import os
 
+# ---------------------------
+# Paths
+# ---------------------------
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "hand_landmarker.task")
+CNN_MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "cnn_lstm_model.h5")
+LABELS_PATH = os.path.join(PROJECT_ROOT, "models", "labels.npy")
 
-def normalize_landmarks(hand):
-    points = np.array([[lm.x, lm.y, lm.z] for lm in hand])
+# ---------------------------
+# Load model and labels
+# ---------------------------
+model = tf.keras.models.load_model(CNN_MODEL_PATH)
+labels = np.load(LABELS_PATH)
+SEQ_LENGTH = 16
+FRAME_SIZE = (64, 64)
+frame_buffer = collections.deque(maxlen=SEQ_LENGTH)
 
-    origin = points[0]  # wrist
-    points -= origin
+# ---------------------------
+# Function to display subtitles
+# ---------------------------
+def draw_subtitle(frame, text, alpha=0.5):
+    h, w = frame.shape[:2]
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 1
+    font_thickness = 2
+    text_color = (255, 255, 255)
+    bg_color = (255, 255, 255)
 
-    scale = np.max(np.linalg.norm(points, axis=1))
-    if scale > 0:
-        points /= scale
+    (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, font_thickness)
+    x = (w - text_width) // 2
+    y = h - 20
 
-    return points.flatten()  # (63,)
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (x-10, y-text_height-10), (x+text_width+10, y+baseline+10), bg_color, cv2.FILLED)
+    cv2.addWeighted(overlay, alpha, frame, 1-alpha, 0, frame)
+    cv2.putText(frame, text, (x, y), font, font_scale, text_color, font_thickness)
 
-# Load model
-base_options = python.BaseOptions(
-    model_asset_path=MODEL_PATH
-)
-
-options = vision.HandLandmarkerOptions(
-    base_options=base_options,
-    num_hands=1
-)
-
-detector = vision.HandLandmarker.create_from_options(options)
-
+# ---------------------------
+# Open webcam
+# ---------------------------
 cap = cv2.VideoCapture(0)
 
 while True:
-    success, frame = cap.read()
-    if not success:
+    ret, frame = cap.read()
+    if not ret:
         break
 
     frame = cv2.flip(frame, 1)
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame_resized = cv2.resize(frame, FRAME_SIZE)
+    frame_rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
+    frame_buffer.append(frame_rgb / 255.0)
 
-    mp_image = mp.Image(
-        image_format=mp.ImageFormat.SRGB,
-        data=rgb
-    )
+    predicted_text = ""
+    if len(frame_buffer) == SEQ_LENGTH:
+        X_input = np.expand_dims(np.array(frame_buffer), axis=0)
+        pred = model.predict(X_input, verbose=0)
+        predicted_class = np.argmax(pred)
+        predicted_text = labels[predicted_class]
 
-    result = detector.detect(mp_image)
+    if predicted_text:
+        draw_subtitle(frame, predicted_text, alpha=0.5)
 
-    if result.hand_landmarks:
-        hand = result.hand_landmarks[0]
-        features = normalize_landmarks(hand)
-
-    cv2.imshow("Hand Tracking", frame)
+    cv2.imshow("Sign Language Interpreter", frame)
     if cv2.waitKey(1) & 0xFF == 27:
         break
 
